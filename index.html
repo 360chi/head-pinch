@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Head Pinch">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Head Pinch</title>
+<style>
+  :root {
+    --red: #ff3b30; --yellow: #ffe14d; --ink: #0b0b0c; --paper: #ffffff;
+    --glass: rgba(18,18,20,.55); --line: rgba(255,255,255,.18);
+    --top: env(safe-area-inset-top, 0px); --bot: env(safe-area-inset-bottom, 0px);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body {
+    width: 100%; height: 100dvh; overflow: hidden; background: #000; color: #fff;
+    touch-action: none; overscroll-behavior: none;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Helvetica Neue", sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  button { font: inherit; color: inherit; border: none; background: none; touch-action: manipulation; cursor: pointer; }
+
+  #stage { position: fixed; inset: 0; }
+  #stage.shake { animation: shake .28s linear; }
+  @keyframes shake {
+    0% { transform: translate(0,0); } 20% { transform: translate(-7px,4px); } 40% { transform: translate(6px,-5px); }
+    60% { transform: translate(-4px,-3px); } 80% { transform: translate(3px,4px); } 100% { transform: translate(0,0); }
+  }
+  #cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  #cam.mirrored { transform: scaleX(-1); }
+  #overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* score */
+  #score {
+    position: fixed; top: calc(var(--top) + 10px); left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 0; padding: 4px 18px 8px;
+    text-shadow: 0 2px 14px rgba(0,0,0,.85);
+  }
+  #pts { font-size: 54px; font-weight: 900; line-height: 1; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; transition: transform .12s ease; }
+  #pts.pop { transform: scale(1.28); }
+  #sub { font-size: 13px; font-weight: 600; opacity: .85; margin-top: 3px; }
+  #combo {
+    position: fixed; top: calc(var(--top) + 96px); left: 50%; transform: translateX(-50%) rotate(-4deg);
+    background: var(--yellow); color: var(--ink); font-weight: 900; font-size: 18px;
+    padding: 4px 12px; border-radius: 999px; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
+  #debug {
+    position: fixed; left: 10px; top: calc(var(--top) + 8px);
+    color: rgba(255,255,255,.5); font-size: 10px; font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 4px rgba(0,0,0,.8); pointer-events: none;
+  }
+
+  /* bottom controls */
+  #hint {
+    position: fixed; left: 78px; right: 78px; bottom: calc(var(--bot) + 84px);
+    text-align: center; font-size: 14px; font-weight: 700; line-height: 1.25;
+    text-shadow: 0 1px 8px rgba(0,0,0,.9); pointer-events: none;
+  }
+  .round {
+    position: fixed; bottom: calc(var(--bot) + 68px); width: 52px; height: 52px; border-radius: 50%;
+    background: var(--glass); border: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    display: grid; place-items: center;
+  }
+  .round svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #sound { left: 14px; } #flip { right: 14px; }
+  #sound.off .wave { display: none; } #sound:not(.off) .mute { display: none; }
+  #pills {
+    position: fixed; left: 0; right: 0; bottom: calc(var(--bot) + 12px);
+    display: flex; justify-content: center; flex-wrap: nowrap; gap: 5px; padding: 0 8px;
+  }
+  #pills button {
+    padding: 10px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+    background: var(--glass); border: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  #pills button.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+
+  /* day sheet */
+  #sheet {
+    position: fixed; inset: 0; z-index: 8; background: rgba(0,0,0,.6);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  #sheetCard {
+    width: 100%; max-width: 460px; background: #151517; border-radius: 22px 22px 0 0;
+    padding: 20px 18px calc(var(--bot) + 18px); border-top: 1px solid var(--line);
+  }
+  #sheetCard h2 { font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+  #bestLine { font-size: 13px; opacity: .7; margin-bottom: 12px; }
+  #days { list-style: none; display: grid; gap: 2px; margin-bottom: 14px; }
+  #days li { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 15px; font-variant-numeric: tabular-nums; }
+  #days li.today { font-weight: 800; }
+  #days .h { opacity: .65; } #days .p { min-width: 64px; text-align: right; }
+  .sheetBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sheetBtns button { padding: 13px 10px; border-radius: 14px; background: rgba(255,255,255,.1); font-size: 14px; font-weight: 700; }
+  .sheetBtns #closeSheet { grid-column: 1 / -1; background: var(--paper); color: var(--ink); }
+
+  /* start */
+  #start {
+    position: fixed; inset: 0; z-index: 10; background: #000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 30px 26px; text-align: center;
+  }
+  #start svg { width: 132px; height: 132px; }
+  #start h1 { font-size: 46px; font-weight: 900; letter-spacing: -2px; line-height: .95; text-transform: uppercase; }
+  #start h1 span { color: var(--red); }
+  #start p { color: rgba(255,255,255,.72); font-size: 16px; line-height: 1.4; max-width: 300px; }
+  #startStats { font-size: 14px; font-weight: 700; color: var(--yellow); min-height: 18px; }
+  #startBtn { margin-top: 6px; padding: 17px 54px; border-radius: 999px; background: var(--red); color: #fff; font-size: 21px; font-weight: 800; }
+  #startBtn:disabled { opacity: .45; }
+  #banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: #b00020; color: #fff;
+    font-size: 14px; line-height: 1.4; padding: calc(var(--top) + 12px) 16px 12px;
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <video id="cam" autoplay muted playsinline></video>
+  <canvas id="overlay"></canvas>
+</div>
+
+<button id="score" type="button" aria-label="Open today's points">
+  <span id="pts">0</span>
+  <span id="sub">0 heads today</span>
+</button>
+<div id="combo" hidden></div>
+<div id="debug"></div>
+
+<div id="hint"></div>
+<button id="sound" class="round" type="button" aria-label="Sound">
+  <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="mute" d="M17 9l5 6M22 9l-5 6"/></svg>
+</button>
+<button id="flip" class="round" type="button" aria-label="Flip camera">
+  <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg>
+</button>
+<div id="pills">
+  <button type="button" data-fx="squish">Squish</button>
+  <button type="button" data-fx="boom">Explode</button>
+  <button type="button" data-fx="eyes">Eyes</button>
+  <button type="button" data-fx="confetti">Confetti</button>
+  <button type="button" data-fx="mix">Mix</button>
+</div>
+
+<div id="sheet" hidden>
+  <div id="sheetCard">
+    <h2>Your week</h2>
+    <div id="bestLine"></div>
+    <ul id="days"></ul>
+    <div class="sheetBtns">
+      <button id="resetDay" type="button">Reset today</button>
+      <button id="trackMode" type="button">Tracking</button>
+      <button id="closeSheet" type="button">Back to pinching</button>
+    </div>
+  </div>
+</div>
+
+<div id="banner" hidden></div>
+
+<div id="start">
+  <svg viewBox="0 0 132 132" aria-hidden="true">
+    <circle cx="66" cy="66" r="24" fill="none" stroke="#ff3b30" stroke-width="5"/>
+    <circle cx="58" cy="62" r="3" fill="#fff"/><circle cx="74" cy="62" r="3" fill="#fff"/>
+    <path d="M57 76q9 6 18 0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <path d="M66 4v26M66 128v-26" stroke="#ffe14d" stroke-width="9" stroke-linecap="round"/>
+    <path d="M56 22l10 10 10-10M56 110l10-10 10 10" fill="none" stroke="#ffe14d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <h1>Head <span>Pinch</span></h1>
+  <p>Aim the back camera at somebody. Hold your other hand out in front of the lens and pinch their head.</p>
+  <div id="startStats"></div>
+  <button id="startBtn" type="button" disabled>Loading</button>
+</div>
+
+<script type="module">
+import { FaceDetector, HandLandmarker, FilesetResolver } from "./assets/vision_bundle.mjs";
+
+const $ = id => document.getElementById(id);
+const stage = $("stage"), video = $("cam"), canvas = $("overlay"), ctx = canvas.getContext("2d");
+const ptsEl = $("pts"), subEl = $("sub"), comboEl = $("combo"), debugEl = $("debug"), hintEl = $("hint");
+const banner = $("banner"), startScreen = $("start"), startBtn = $("startBtn");
+
+const params = new URLSearchParams(location.search);
+const FORCE_CPU = params.has("cpu");
+const TEST_SRC = params.get("src"); // test only: play a still image as the camera
+
+// ---------- tuning ----------
+const PINCH_CLOSE = 0.30;      // finger gap under this share of hand size counts as closed
+const PINCH_OPEN = 0.50;       // gap over this share re-arms the pinch
+const FACE_PERSIST_MS = 900;   // a head stays pinchable this long after the hand covers it
+const COOLDOWN_MS = 700;       // rest time before the same head scores again
+const COMBO_WINDOW_MS = 4000;  // hits inside this window chain a combo
+const BASE_POINTS = 100;
+const FAR_RATIO = 0.16, LONG_RATIO = 0.08; // face width as a share of the short screen side
+
+const RED = "#ff3b30", YELLOW = "#ffe14d";
+const CONFETTI = ["#ff3b30", "#ffe14d", "#34c759", "#0a84ff", "#ff9f0a", "#bf5af2", "#ffffff"];
+
+// ---------- saved state ----------
+const DAY_KEY = "headpinch.days.v1", PREF_KEY = "headpinch.prefs.v1";
+const readJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let days = readJSON(DAY_KEY, {});
+let prefs = Object.assign({ fx: "mix", sound: true }, readJSON(PREF_KEY, {}));
+
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function today() {
+  const k = dayKey();
+  if (!days[k]) days[k] = { pts: 0, heads: 0, combo: 0 };
+  return days[k];
+}
+function saveDays() {
+  const keys = Object.keys(days).sort();
+  while (keys.length > 120) delete days[keys.shift()];
+  writeJSON(DAY_KEY, days);
+}
+function bestDay() {
+  let best = null;
+  for (const [k, v] of Object.entries(days)) if (v.pts > 0 && (!best || v.pts > best.pts)) best = { key: k, ...v };
+  return best;
+}
+const fmt = n => Math.round(n).toLocaleString();
+const heads = n => `${fmt(n)} ${n === 1 ? "head" : "heads"}`;
+
+// ---------- game state ----------
+let faceFull, faceShort, handLandmarker, handDelegate = "GPU";
+let stream = null, facing = "environment", mirrored = false;
+let started = false, running = false, loopToken = 0;
+let W = 0, H = 0, DPR = 1, T = null;
+let faces = [], nextFaceId = 1;
+const pinch = { closed: false, armed: false, hand: null, lastSeen: 0 };
+let combo = 0, lastHitAt = -1e9;
+const fx = [], parts = [], floats = [];
+let flashAt = -1e9, lastFrameAt = 0, lastVideoTime = -1, frameNo = 0;
+let frames = 0, lastFpsAt = performance.now(), fps = 0, handCount = 0;
+let lastHandAt = 0, lastFaceAt = 0;
+
+function showBanner(msg) { banner.textContent = msg; banner.hidden = false; }
+
+// ---------- sound (made in the browser, no files) ----------
+let actx = null;
+function initAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!actx && AC) { try { actx = new AC(); } catch {} }
+  if (actx && actx.state === "suspended") actx.resume().catch(() => {});
+}
+function tone(type, f0, f1, dur, gain = 0.25, delay = 0) {
+  if (!actx || !prefs.sound) return;
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(f1, 20), t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.03);
+}
+function noise(dur, gain, f0, f1, delay = 0) {
+  if (!actx || !prefs.sound) return;
+  const t = actx.currentTime + delay, n = Math.floor(actx.sampleRate * dur);
+  const buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  const s = actx.createBufferSource(), flt = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = buf; flt.type = "lowpass"; flt.frequency.setValueAtTime(f0, t); flt.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(flt).connect(g).connect(actx.destination); s.start(t);
+}
+const sfx = {
+  squish() { tone("sine", 520, 80, 0.2, 0.3); noise(0.12, 0.12, 900, 200); tone("sine", 140, 420, 0.16, 0.14, 0.28); },
+  boom() { noise(0.45, 0.5, 2400, 120); tone("sine", 190, 36, 0.4, 0.45); tone("square", 90, 40, 0.18, 0.1); },
+  eyes() { tone("triangle", 260, 980, 0.13, 0.25); tone("triangle", 300, 1100, 0.13, 0.25, 0.07); tone("sine", 700, 380, 0.5, 0.1, 0.2); },
+  confetti() { noise(0.2, 0.2, 5000, 1500); for (let i = 0; i < 6; i++) tone("triangle", 900 + Math.random() * 1400, 700 + Math.random() * 900, 0.09, 0.1, 0.03 + i * 0.045); },
+  miss() { tone("sine", 220, 160, 0.07, 0.08); },
+  combo(n) { tone("sine", 660 * Math.pow(2, Math.min(n, 12) / 12), 660 * Math.pow(2, Math.min(n, 12) / 12), 0.12, 0.12, 0.12); },
+};
+
+// ---------- models ----------
+async function loadModels() {
+  const vision = await FilesetResolver.forVisionTasks("./assets/wasm");
+  // Face models are tiny, so they run on the processor. That avoids a graphics bug some iPhones have.
+  const face = path => FaceDetector.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: path, delegate: "CPU" }, runningMode: "VIDEO", minDetectionConfidence: 0.45,
+  });
+  const hand = delegate => HandLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "./assets/models/hand_landmarker.task", delegate },
+    runningMode: "VIDEO", numHands: 2,
+    minHandDetectionConfidence: 0.4, minHandPresenceConfidence: 0.4, minTrackingConfidence: 0.4,
+  });
+  faceFull = await face("./assets/models/blaze_face_full_range.tflite");
+  faceShort = await face("./assets/models/blaze_face_short_range.tflite");
+  handDelegate = FORCE_CPU ? "CPU" : "GPU";
+  try { handLandmarker = await hand(handDelegate); }
+  catch (e) { console.warn("Fast hand tracking failed, using the processor", e); handDelegate = "CPU"; handLandmarker = await hand("CPU"); }
+}
+const faceDetector = () => (facing === "user" && !TEST_SRC ? faceShort : faceFull);
+
+// ---------- camera ----------
+async function startCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+  if (TEST_SRC) {
+    const img = new Image(); img.src = TEST_SRC; await img.decode();
+    const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext("2d"), paint = () => g.drawImage(img, 0, 0);
+    paint(); setInterval(paint, 33);
+    stream = c.captureStream(30); mirrored = false;
+  } else {
+    const base = { width: { ideal: 1280 }, height: { ideal: 720 } };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: false,
+        video: { ...base, facingMode: facing === "environment" ? { exact: "environment" } : "user" } });
+    } catch {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...base, facingMode: facing } });
+    }
+    const real = stream.getVideoTracks()[0]?.getSettings?.().facingMode;
+    mirrored = real ? real === "user" : true; // a laptop webcam reports nothing and faces the player
+    if (real === "user" || real === "environment") facing = real;
+  }
+  video.srcObject = stream;
+  video.classList.toggle("mirrored", mirrored);
+  await video.play();
+  lastVideoTime = -1; faces = [];
+}
+let wake = null;
+async function keepAwake() { try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
+
+function sizeCanvas() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+}
+window.addEventListener("resize", sizeCanvas);
+
+// The video fills the screen and crops the overflow. These map video pixels to screen points.
+function cover() {
+  const vw = video.videoWidth, vh = video.videoHeight, s = Math.max(W / vw, H / vh);
+  return { s, ox: (W - vw * s) / 2, oy: (H - vh * s) / 2, vw, vh };
+}
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const easeOut = x => 1 - Math.pow(1 - clamp01(x), 3);
+const backOut = x => { const c = clamp01(x) - 1; return 1 + 2.7 * c * c * c + 1.7 * c * c; };
+const screenX = x => (mirrored ? W - x : x);
+
+// ---------- face tracking ----------
+function updateFaces(dets, now) {
+  for (const d of dets) {
+    const b = d.boundingBox; if (!b) continue;
+    const x = b.originX * T.s + T.ox, y = b.originY * T.s + T.oy, w = b.width * T.s, h = b.height * T.s;
+    const kp = (d.keypoints || []).slice(0, 2).map(k => ({ x: k.x * T.vw * T.s + T.ox, y: k.y * T.vh * T.s + T.oy }));
+    const eyes = kp.length === 2 ? kp : [{ x: x + w * 0.3, y: y + h * 0.38 }, { x: x + w * 0.7, y: y + h * 0.38 }];
+    let best = null, bestD = Infinity;
+    for (const f of faces) {
+      const dd = Math.hypot(f.x + f.w / 2 - (x + w / 2), f.y + f.h / 2 - (y + h / 2));
+      if (dd < bestD && dd < Math.max(f.w, w)) { best = f; bestD = dd; }
+    }
+    if (best) {
+      const a = 0.6;
+      best.x += (x - best.x) * a; best.y += (y - best.y) * a; best.w += (w - best.w) * a; best.h += (h - best.h) * a;
+      best.eyes = eyes.map((e, i) => ({ x: best.eyes[i].x + (e.x - best.eyes[i].x) * a, y: best.eyes[i].y + (e.y - best.eyes[i].y) * a }));
+      best.lastSeen = now;
+    } else {
+      faces.push({ x, y, w, h, eyes, lastSeen: now, cooldownUntil: 0, id: nextFaceId++ });
+    }
+  }
+  faces = faces.filter(f => now - f.lastSeen < FACE_PERSIST_MS);
+  if (faces.length) lastFaceAt = now;
+}
+// The face box runs brow to chin. The head box adds hair and ears, and it is the hit area.
+const head = f => ({ x: f.x - f.w * 0.14, y: f.y - f.h * 0.42, w: f.w * 1.28, h: f.h * 1.56 });
+
+// ---------- pinch ----------
+function readHand(res) {
+  const list = res.landmarks || []; handCount = list.length;
+  let best = null;
+  for (const lm of list) {
+    const P = i => ({ x: lm[i].x * T.vw * T.s + T.ox, y: lm[i].y * T.vh * T.s + T.oy });
+    const wrist = P(0), a = P(5), b = P(17), thumb = P(4), index = P(8);
+    const size = Math.max(dist(wrist, a), dist(wrist, b), dist(a, b) * 1.6);
+    // the biggest hand is the nearest one, so it is the player's
+    if (!best || size > best.size) best = { thumb, index, size, gap: dist(thumb, index), mid: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 } };
+  }
+  return best;
+}
+function updatePinch(hand, now) {
+  pinch.hand = hand;
+  if (!hand) { if (now - pinch.lastSeen > 300) { pinch.closed = false; pinch.armed = false; } return; }
+  pinch.lastSeen = now; lastHandAt = now;
+  const r = hand.gap / hand.size;
+  if (r > PINCH_OPEN) { pinch.armed = true; pinch.closed = false; }
+  else if (r < PINCH_CLOSE && !pinch.closed) {
+    pinch.closed = true;
+    if (pinch.armed) { pinch.armed = false; onPinch(hand, now); }
+  }
+}
+function onPinch(hand, now) {
+  const axis = Math.abs(hand.thumb.y - hand.index.y) >= Math.abs(hand.thumb.x - hand.index.x) ? "y" : "x";
+  let hit = null, hitD = Infinity;
+  for (const f of faces) {
+    if (now < f.cooldownUntil) continue;
+    const hd = head(f), pad = Math.max(hd.w * 0.2, Math.min(W, H) * 0.04);
+    if (hand.mid.x < hd.x - pad || hand.mid.x > hd.x + hd.w + pad || hand.mid.y < hd.y - pad || hand.mid.y > hd.y + hd.h + pad) continue;
+    const dd = Math.hypot(hd.x + hd.w / 2 - hand.mid.x, hd.y + hd.h / 2 - hand.mid.y);
+    if (dd < hitD) { hit = f; hitD = dd; }
+  }
+  if (!hit) { fx.push({ type: "ring", x: hand.mid.x, y: hand.mid.y, start: now, dur: 320 }); sfx.miss(); return; }
+  scoreHit(hit, axis, now);
+}
+function scoreHit(f, axis, now) {
+  f.cooldownUntil = now + COOLDOWN_MS;
+  const ratio = f.w / Math.min(W, H);
+  const range = ratio < LONG_RATIO ? 3 : ratio < FAR_RATIO ? 2 : 1;
+  combo = now - lastHitAt < COMBO_WINDOW_MS ? combo + 1 : 1; lastHitAt = now;
+  const mult = Math.min(1 + 0.5 * (combo - 1), 5);
+  const pts = Math.round(BASE_POINTS * range * mult / 10) * 10;
+  const d = today(); d.pts += pts; d.heads += 1; d.combo = Math.max(d.combo || 0, combo); saveDays();
+
+  const hd = head(f);
+  const tags = []; if (range === 3) tags.push("LONG SHOT"); else if (range === 2) tags.push("FAR"); if (combo > 1) tags.push(`COMBO x${combo}`);
+  floats.push({ x: hd.x + hd.w / 2, y: hd.y, txt: `+${fmt(pts)}`, sub: tags.join("  "), born: now, life: 1100 });
+
+  const pick = prefs.fx === "mix" ? ["squish", "boom", "eyes", "confetti"][Math.floor(Math.random() * 4)] : prefs.fx;
+  fire(pick, f, axis, now);
+  if (combo > 1) sfx.combo(combo);
+  renderHud(true); tickHud(now);
+}
+
+// ---------- effects ----------
+function fire(name, f, axis, now) {
+  const side = Math.min(W, H), hd = head(f), base = Math.min(Math.max(hd.w, side * 0.16), side * 0.45);
+  const cx = hd.x + hd.w / 2, cy = hd.y + hd.h / 2;
+  if (name === "squish") {
+    fx.push({ type: "squish", f, axis, start: now, dur: 560 }); sfx.squish();
+  } else if (name === "boom") {
+    const snap = grab(hd), cols = 6, rows = 7;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const px = hd.x + (c + 0.5) * hd.w / cols, py = hd.y + (r + 0.5) * hd.h / rows;
+      let dx = px - cx + (Math.random() - 0.5) * hd.w * 0.3, dy = py - cy + (Math.random() - 0.5) * hd.h * 0.3;
+      const len = Math.hypot(dx, dy) || 1, sp = base * (2 + Math.random() * 3.6);
+      parts.push({ kind: "chunk", img: snap, c, r, cols, rows, x: px, y: py, w: hd.w / cols, h: hd.h / rows,
+        vx: dx / len * sp, vy: dy / len * sp - base * 1.6, g: base * 7.5, rot: 0, vr: (Math.random() - 0.5) * 16,
+        born: now, life: 800 + Math.random() * 500 });
+    }
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * 6.283, sp = base * (0.5 + Math.random() * 1.1);
+      parts.push({ kind: "puff", x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - base * 0.5, g: 0, size: base * (0.12 + Math.random() * 0.16), born: now, life: 600 + Math.random() * 300 });
+    }
+    fx.push({ type: "blast", f, base, start: now, dur: 620 });
+    flashAt = now; shake(); sfx.boom();
+  } else if (name === "eyes") {
+    fx.push({ type: "eyes", f, start: now, dur: 1350 }); sfx.eyes();
+  } else {
+    for (let i = 0; i < 80; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.6, sp = base * (2.2 + Math.random() * 4);
+      parts.push({ kind: "conf", x: cx + (Math.random() - 0.5) * hd.w * 0.4, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: base * 6,
+        w: 5 + Math.random() * 7, h: 8 + Math.random() * 9, rot: Math.random() * 6.283, vr: (Math.random() - 0.5) * 20,
+        color: CONFETTI[i % CONFETTI.length], born: now, life: 1300 + Math.random() * 900 });
+    }
+    fx.push({ type: "ring", x: cx, y: cy, start: now, dur: 380, big: base, color: "#ffffff" });
+    sfx.confetti();
+  }
+  if (parts.length > 500) parts.splice(0, parts.length - 500);
+}
+function shake() { stage.classList.remove("shake"); void stage.offsetWidth; stage.classList.add("shake"); }
+
+// copy a piece of the live picture (screen rectangle in, small canvas out)
+function grab(r) {
+  try {
+    const x0 = Math.max((r.x - T.ox) / T.s, 0), y0 = Math.max((r.y - T.oy) / T.s, 0);
+    const x1 = Math.min((r.x + r.w - T.ox) / T.s, T.vw), y1 = Math.min((r.y + r.h - T.oy) / T.s, T.vh);
+    if (x1 - x0 < 2 || y1 - y0 < 2) return null;
+    const k = Math.min(1, 220 / (x1 - x0));
+    const c = document.createElement("canvas"); c.width = Math.max(2, Math.round((x1 - x0) * k)); c.height = Math.max(2, Math.round((y1 - y0) * k));
+    c.getContext("2d").drawImage(video, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+    return c;
+  } catch { return null; }
+}
+// draw a piece of the live picture somewhere else on screen, clipped to what the camera sees
+function drawVid(wx, wy, ww, wh, dx, dy, dw, dh) {
+  const sx = (wx - T.ox) / T.s, sy = (wy - T.oy) / T.s, sw = ww / T.s, sh = wh / T.s;
+  const x0 = Math.max(sx, 0), y0 = Math.max(sy, 0), x1 = Math.min(sx + sw, T.vw), y1 = Math.min(sy + sh, T.vh);
+  if (x1 - x0 < 1 || y1 - y0 < 1 || dw < 0.5 || dh < 0.5) return;
+  const a0 = (x0 - sx) / sw, b0 = (y0 - sy) / sh, a1 = (x1 - sx) / sw, b1 = (y1 - sy) / sh;
+  ctx.drawImage(video, x0, y0, x1 - x0, y1 - y0, dx + dw * a0, dy + dh * b0, dw * (a1 - a0), dh * (b1 - b0));
+}
+function squishAmount(t) {
+  if (t < 0.22) return 1 - 0.64 * easeOut(t / 0.22);
+  if (t < 0.58) return 0.36 + 0.03 * Math.sin((t - 0.22) * 40);
+  const u = (t - 0.58) / 0.42;
+  return 0.36 + 0.64 * backOut(u);
+}
+function drawSquish(e, now) {
+  const t = clamp01((now - e.start) / e.dur), k = squishAmount(t), hd = head(e.f);
+  if (e.axis === "x") {
+    const m = hd.w * 0.7, nw = hd.w * k, nl = hd.x + (hd.w - nw) / 2, nr = nl + nw, y = hd.y - hd.h * 0.05, h = hd.h * 1.1;
+    drawVid(hd.x - m, y, m, h, hd.x - m, y, nl - (hd.x - m), h);
+    drawVid(hd.x, y, hd.w, h, nl, y, nw, h);
+    drawVid(hd.x + hd.w, y, m, h, nr, y, hd.x + hd.w + m - nr, h);
+  } else {
+    const m = hd.h * 0.6, nh = hd.h * k, nt = hd.y + (hd.h - nh) / 2, nb = nt + nh, x = hd.x - hd.w * 0.05, w = hd.w * 1.1;
+    drawVid(x, hd.y - m, w, m, x, hd.y - m, w, nt - (hd.y - m));
+    drawVid(x, hd.y, w, hd.h, x, nt, w, nh);
+    drawVid(x, hd.y + hd.h, w, m, x, nb, w, hd.y + hd.h + m - nb);
+  }
+}
+function drawBlast(e, now) {
+  const t = clamp01((now - e.start) / e.dur), hd = head(e.f), cx = hd.x + hd.w / 2, cy = hd.y + hd.h / 2;
+  ctx.fillStyle = `rgba(30,22,22,${0.92 * (1 - t * t)})`;
+  ctx.beginPath(); ctx.ellipse(cx, cy, hd.w * 0.62, hd.h * 0.6, 0, 0, 6.283); ctx.fill();
+  const layers = [["#ff7a00", 1], ["#ffd21f", 0.72], ["#ffffff", 0.42]];
+  for (const [col, k] of layers) {
+    const R = e.base * (0.45 + 1.25 * easeOut(t)) * k, spikes = 13;
+    ctx.globalAlpha = 1 - t; ctx.fillStyle = col; ctx.beginPath();
+    for (let i = 0; i < spikes * 2; i++) {
+      const a = i * Math.PI / spikes + e.start * 0.001, rr = i % 2 ? R * 0.56 : R;
+      ctx[i ? "lineTo" : "moveTo"](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawEyes(e, now) {
+  const ms = now - e.start, t = clamp01(ms / e.dur), f = e.f;
+  const r = Math.max(f.w * 0.2, 9);
+  const pop = t < 0.14 ? backOut(t / 0.14) : t > 0.82 ? 1 - clamp01((t - 0.82) / 0.18) : 1;
+  const dang = t < 0.14 ? 0 : t > 0.82 ? 1 - clamp01((t - 0.82) / 0.18) : easeOut((t - 0.14) / 0.25);
+  const leftIdx = f.eyes[0].x <= f.eyes[1].x ? 0 : 1;
+  f.eyes.forEach((p, i) => {
+    const side = i === leftIdx ? -1 : 1;
+    const sway = Math.sin(ms / 95 + i * 1.9) * 0.14 * dang;
+    const ex = p.x + (side * 0.2 + sway) * f.w * dang, ey = p.y + f.w * 0.6 * dang * (1 + 0.07 * Math.sin(ms / 70 + i));
+    const R = r * 1.55 * pop; if (R < 0.5) return;
+    ctx.fillStyle = "#2a0d0d"; ctx.beginPath(); ctx.ellipse(p.x, p.y, r * 0.8 * Math.min(pop, 1), r * 0.6 * Math.min(pop, 1), 0, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = "#d8443c"; ctx.lineWidth = r * 0.55 * Math.min(pop, 1); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.quadraticCurveTo(p.x + (ex - p.x) * 0.15, ey + r * 0.5 * dang, ex, ey); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#141414"; ctx.lineWidth = Math.max(1.5, R * 0.09);
+    ctx.beginPath(); ctx.arc(ex, ey, R, 0, 6.283); ctx.fill(); ctx.stroke();
+    const a = ms / 130 * (i ? 1 : -1), ix = ex + Math.cos(a) * R * 0.3, iy = ey + Math.sin(a) * R * 0.3;
+    ctx.fillStyle = "#2b8cff"; ctx.beginPath(); ctx.arc(ix, iy, R * 0.5, 0, 6.283); ctx.fill();
+    ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(ix, iy, R * 0.27, 0, 6.283); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ix - R * 0.15, iy - R * 0.17, R * 0.1, 0, 6.283); ctx.fill();
+  });
+}
+function drawRing(e, now) {
+  const t = clamp01((now - e.start) / e.dur), R = (e.big || Math.min(W, H) * 0.07) * (0.3 + 0.9 * easeOut(t));
+  ctx.strokeStyle = e.color || "rgba(255,255,255,.8)"; ctx.globalAlpha = 1 - t; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1;
+}
+function drawParts(now, dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i], age = now - p.born;
+    if (age > p.life) { parts.splice(i, 1); continue; }
+    p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.vr) p.rot += p.vr * dt;
+    const u = age / p.life, alpha = u > 0.7 ? 1 - (u - 0.7) / 0.3 : 1;
+    ctx.globalAlpha = alpha;
+    if (p.kind === "puff") {
+      ctx.fillStyle = "rgba(235,228,220,.5)"; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.6 + u), 0, 6.283); ctx.fill();
+    } else {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      if (p.kind === "chunk") {
+        if (p.img) { const sw = p.img.width / p.cols, sh = p.img.height / p.rows; ctx.drawImage(p.img, p.c * sw, p.r * sh, sw, sh, -p.w / 2, -p.h / 2, p.w, p.h); }
+        else { ctx.fillStyle = "#d6a07a"; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); }
+      } else {
+        ctx.fillStyle = p.color; ctx.scale(1, Math.cos(age / 90 + p.rot)); ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      }
+      ctx.restore();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function draw(now, dt) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!video.videoWidth) return;
+  for (let i = fx.length - 1; i >= 0; i--) if (now - fx[i].start > fx[i].dur) fx.splice(i, 1);
+
+  ctx.save();
+  if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+  for (const e of fx) if (e.type === "squish") drawSquish(e, now);
+  for (const f of faces) {
+    const hd = head(f);
+    ctx.strokeStyle = now < f.cooldownUntil ? YELLOW : RED; ctx.lineWidth = 3;
+    roundRect(hd.x, hd.y, hd.w, hd.h, Math.min(hd.w, hd.h) * 0.14); ctx.stroke();
+  }
+  for (const e of fx) { if (e.type === "blast") drawBlast(e, now); else if (e.type === "eyes") drawEyes(e, now); else if (e.type === "ring") drawRing(e, now); }
+  drawParts(now, dt);
+  if (pinch.hand) {
+    const { thumb, index } = pinch.hand, col = pinch.closed ? YELLOW : "rgba(80,230,130,.95)";
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(thumb.x, thumb.y); ctx.lineTo(index.x, index.y); ctx.stroke();
+    for (const p of [thumb, index]) { ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, 6.283); ctx.fill(); }
+  }
+  ctx.restore();
+
+  // score pops are text, so they are drawn the right way round
+  ctx.textAlign = "center"; ctx.lineJoin = "round";
+  for (let i = floats.length - 1; i >= 0; i--) {
+    const fl = floats[i], u = (now - fl.born) / fl.life;
+    if (u > 1) { floats.splice(i, 1); continue; }
+    const x = Math.max(70, Math.min(W - 70, screenX(fl.x))), y = Math.max(fl.y - 14 - 70 * easeOut(u), 190);
+    ctx.globalAlpha = u > 0.65 ? 1 - (u - 0.65) / 0.35 : 1;
+    const s = 0.7 + 0.3 * backOut(u / 0.2);
+    ctx.font = `900 ${Math.round(40 * s)}px -apple-system, "Helvetica Neue", sans-serif`;
+    ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0,0,0,.75)"; ctx.strokeText(fl.txt, x, y); ctx.fillStyle = "#fff"; ctx.fillText(fl.txt, x, y);
+    if (fl.sub) {
+      ctx.font = `800 14px -apple-system, "Helvetica Neue", sans-serif`;
+      ctx.lineWidth = 4; ctx.strokeText(fl.sub, x, y + 20); ctx.fillStyle = YELLOW; ctx.fillText(fl.sub, x, y + 20);
+    }
+  }
+  ctx.globalAlpha = 1;
+  const fa = 1 - (now - flashAt) / 160;
+  if (fa > 0) { ctx.fillStyle = `rgba(255,255,255,${0.42 * fa})`; ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- hud ----------
+let hudDay = "";
+function renderHud(pop) {
+  const d = today();
+  ptsEl.textContent = fmt(d.pts);
+  subEl.textContent = `${heads(d.heads)} today`;
+  hudDay = dayKey();
+  if (pop) { ptsEl.classList.add("pop"); setTimeout(() => ptsEl.classList.remove("pop"), 140); }
+}
+function renderStartStats() {
+  const d = today(), b = bestDay(), bits = [];
+  if (d.pts) bits.push(`Today ${fmt(d.pts)} pts, ${heads(d.heads)}`);
+  if (b && b.key !== dayKey()) bits.push(`Best day ${fmt(b.pts)}`);
+  $("startStats").textContent = bits.join("  ·  ");
+}
+function tickHud(now) {
+  if (dayKey() !== hudDay) renderHud(false);
+  const live = combo > 1 && now - lastHitAt < COMBO_WINDOW_MS;
+  comboEl.hidden = !live; if (live) comboEl.textContent = `Combo x${combo}`;
+  let hint = "";
+  if (now - lastHitAt > 2500) {
+    if (now - lastFaceAt > 1500) hint = "Find a head";
+    else if (now - lastHandAt > 2000) hint = "Hold your hand out in front of the lens";
+    else if (pinch.hand && !pinch.armed && !pinch.closed) hint = "Open your fingers, then pinch";
+  }
+  if (hintEl.textContent !== hint) hintEl.textContent = hint;
+}
+
+// ---------- loop ----------
+function frame(now, force) {
+  if (video.readyState < 2 || !video.videoWidth) return;
+  const dt = Math.min((now - lastFrameAt) / 1000, 0.05); lastFrameAt = now;
+  T = cover();
+  if (force || video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime; frameNo++;
+    if (frameNo % 2 || force) updateFaces(faceDetector().detectForVideo(video, now).detections, now);
+    updatePinch(readHand(handLandmarker.detectForVideo(video, now)), now);
+    frames++;
+  }
+  draw(now, dt);
+  if (now - lastFpsAt > 1000) {
+    fps = frames; frames = 0; lastFpsAt = now;
+    debugEl.textContent = `${fps} fps · ${faces.length} face · ${handCount} hand · ${handDelegate === "GPU" ? "fast" : "safe"}`;
+    tickHud(now);
+  }
+}
+function loop(token) {
+  if (!running || token !== loopToken) return;
+  try { frame(performance.now(), false); } catch (e) { console.error(e); }
+  requestAnimationFrame(() => loop(token));
+}
+function run() { running = true; lastFrameAt = performance.now(); const t = ++loopToken; requestAnimationFrame(() => loop(t)); }
+
+document.addEventListener("visibilitychange", async () => {
+  if (!started) return;
+  if (document.hidden) { running = false; return; }
+  const tr = stream && stream.getVideoTracks()[0];
+  try { if (!tr || tr.readyState !== "live") await startCamera(); else await video.play(); } catch (e) { showBanner("The camera stopped. Reload the page to start it again."); }
+  keepAwake(); run();
+});
+
+// ---------- controls ----------
+for (const ev of ["gesturestart", "gesturechange"]) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+
+const pillBtns = [...document.querySelectorAll("#pills button")];
+function setFx(name) { prefs.fx = name; writeJSON(PREF_KEY, prefs); pillBtns.forEach(b => b.classList.toggle("on", b.dataset.fx === name)); }
+pillBtns.forEach(b => b.addEventListener("click", () => { initAudio(); setFx(b.dataset.fx); }));
+setFx(prefs.fx);
+
+const soundBtn = $("sound");
+const paintSound = () => soundBtn.classList.toggle("off", !prefs.sound);
+soundBtn.addEventListener("click", () => { prefs.sound = !prefs.sound; writeJSON(PREF_KEY, prefs); paintSound(); initAudio(); if (prefs.sound) sfx.squish(); });
+paintSound();
+
+const flipBtn = $("flip");
+flipBtn.addEventListener("click", async () => {
+  facing = facing === "environment" ? "user" : "environment";
+  flipBtn.disabled = true;
+  try { await startCamera(); } catch (e) { showBanner("Could not switch cameras: " + e.message); } finally { flipBtn.disabled = false; }
+});
+
+// day sheet
+const sheet = $("sheet"), resetBtn = $("resetDay"), trackBtn = $("trackMode");
+function openSheet() {
+  const list = $("days"); list.textContent = "";
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(); dt.setDate(dt.getDate() - i);
+    const k = dayKey(dt), v = days[k] || { pts: 0, heads: 0 };
+    const li = document.createElement("li"); if (i === 0) li.className = "today";
+    const name = document.createElement("span"); name.textContent = i === 0 ? "Today" : i === 1 ? "Yesterday" : dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const h = document.createElement("span"); h.className = "h"; h.textContent = heads(v.heads);
+    const p = document.createElement("span"); p.className = "p"; p.textContent = fmt(v.pts);
+    li.append(name, h, p); list.append(li);
+  }
+  const b = bestDay(), d = today();
+  $("bestLine").textContent = b ? `Best day ${fmt(b.pts)} points. Longest combo today x${d.combo || 0}.` : "Pinch a head to put points on the board.";
+  resetBtn.textContent = "Reset today"; resetBtn.dataset.armed = "";
+  trackBtn.textContent = handDelegate === "GPU" ? "Tracking is fast" : "Tracking is safe";
+  sheet.hidden = false;
+}
+$("score").addEventListener("click", openSheet);
+$("closeSheet").addEventListener("click", () => { sheet.hidden = true; });
+sheet.addEventListener("click", e => { if (e.target === sheet) sheet.hidden = true; });
+resetBtn.addEventListener("click", () => {
+  if (!resetBtn.dataset.armed) { resetBtn.dataset.armed = "1"; resetBtn.textContent = "Tap again to wipe today"; return; }
+  delete days[dayKey()]; saveDays(); combo = 0; renderHud(false); openSheet();
+});
+// Fast uses the graphics chip. Safe uses the processor, for phones where the hand dots land in the wrong place.
+trackBtn.addEventListener("click", () => {
+  const u = new URL(location.href);
+  if (u.searchParams.has("cpu")) u.searchParams.delete("cpu"); else u.searchParams.set("cpu", "1");
+  location.replace(u);
+});
+
+startBtn.addEventListener("click", async () => {
+  startBtn.disabled = true; initAudio();
+  try {
+    await startCamera();
+    startScreen.remove(); sizeCanvas(); renderHud(false);
+    started = true; keepAwake(); run();
+  } catch (e) {
+    startBtn.disabled = false; startBtn.textContent = "Try again";
+    showBanner(e && e.name === "NotAllowedError"
+      ? "The camera is blocked. In Safari, tap the aA button, then Website Settings, and set Camera to Allow. Then reload."
+      : "Camera failed: " + (e && e.message ? e.message : e));
+  }
+});
+
+// test hooks (used by the build checks, harmless in play)
+window.HP = {
+  tick: () => frame(performance.now(), true),
+  state: () => ({ W, H, faces: faces.map(f => ({ ...head(f), eyes: f.eyes })), hand: pinch.hand, today: today(), combo, fx: fx.map(e => e.type), parts: parts.length, floats: floats.length, handDelegate, mirrored }),
+  pinchAt: (x, y, axis = "y", t = performance.now()) => onPinch({ thumb: { x, y: y - (axis === "y" ? 4 : 0) }, index: { x: x + (axis === "x" ? 4 : 0), y: y + (axis === "y" ? 4 : 0) }, mid: { x, y }, size: 100, gap: 4 }, t),
+  pause: () => { running = false; },
+  frameAt: t => frame(t, true),
+  setFx,
+};
+
+renderStartStats(); renderHud(false);
+if (!TEST_SRC && !navigator.mediaDevices) {
+  showBanner("This page has no camera access. Open it from an https link in Safari.");
+  startBtn.textContent = "Camera unavailable";
+} else {
+  loadModels().then(() => { startBtn.disabled = false; startBtn.textContent = "Start"; })
+    .catch(e => showBanner("The tracking models did not load: " + e.message));
+}
+</script>
+</body>
+</html>
