@@ -44,7 +44,7 @@
   }
   #pts { font-size: 54px; font-weight: 900; line-height: 1; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; transition: transform .12s ease; }
   #pts.pop { transform: scale(1.28); }
-  #sub { font-size: 13px; font-weight: 600; opacity: .85; margin-top: 3px; }
+  #sub { font-size: 13px; font-weight: 600; opacity: .85; margin-top: 3px; white-space: nowrap; }
   #combo {
     position: fixed; top: calc(var(--top) + 96px); left: 50%; transform: translateX(-50%) rotate(-4deg);
     background: var(--yellow); color: var(--ink); font-weight: 900; font-size: 18px;
@@ -53,7 +53,7 @@
   #toast {
     position: fixed; left: 50%; top: 36%; z-index: 6; width: max-content; max-width: calc(100% - 36px);
     transform: translate(-50%, -50%) rotate(-3deg) scale(.4); opacity: 0; pointer-events: none;
-    background: var(--yellow); color: var(--ink); text-align: center;
+    background: var(--yellow); color: var(--ink); text-align: center; text-wrap: balance;
     font-size: 27px; font-weight: 900; line-height: 1.1; letter-spacing: -.5px;
     padding: 16px 22px; border-radius: 22px; box-shadow: 0 10px 34px rgba(0,0,0,.5);
     transition: transform .28s cubic-bezier(.2,1.5,.4,1), opacity .2s ease;
