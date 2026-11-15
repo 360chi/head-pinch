@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Head Pinch">
+<meta name="apple-mobile-web-app-title" content="Head Crusher">
 <meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="icon-180.png">
-<title>Head Pinch</title>
+<title>Head Crusher</title>
 <style>
   :root {
     --red: #ff3b30; --yellow: #ffe14d; --ink: #0b0b0c; --paper: #ffffff;
@@ -70,6 +70,31 @@
   }
   .round svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   #sound { left: 14px; } #flip { right: 14px; }
+  #zoneBtn { right: 14px; bottom: calc(var(--bot) + 132px); }
+
+  /* crush zone editor: drag the edges like a crop */
+  #zoneEdit { position: fixed; inset: 0; z-index: 7; touch-action: none; }
+  #zoneBox {
+    position: absolute; border: 2px solid var(--yellow); border-radius: 14px;
+    box-shadow: 0 0 0 200vmax rgba(0,0,0,.55);
+  }
+  #zoneBox .grip { position: absolute; background: var(--yellow); border-radius: 999px; touch-action: none; }
+  #zoneBox .grip::after { content: ""; position: absolute; inset: -22px; } /* a big finger target */
+  #zoneBox .g-top, #zoneBox .g-bottom { left: 50%; width: 64px; height: 8px; margin-left: -32px; }
+  #zoneBox .g-top { top: -5px; } #zoneBox .g-bottom { bottom: -5px; }
+  #zoneBox .g-left, #zoneBox .g-right { top: 50%; width: 8px; height: 64px; margin-top: -32px; }
+  #zoneBox .g-left { left: -5px; } #zoneBox .g-right { right: -5px; }
+  #zoneLabel {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center;
+    font-size: 15px; font-weight: 800; line-height: 1.35; text-shadow: 0 1px 8px rgba(0,0,0,.9); pointer-events: none; white-space: nowrap;
+  }
+  #zoneLabel small { display: block; font-size: 12px; font-weight: 600; opacity: .8; }
+  #zoneBar {
+    position: fixed; left: 0; right: 0; bottom: calc(var(--bot) + 14px); z-index: 8;
+    display: flex; justify-content: center; gap: 10px;
+  }
+  #zoneBar button { padding: 13px 22px; border-radius: 999px; font-size: 15px; font-weight: 800; background: var(--glass); border: 1px solid var(--line); }
+  #zoneBar #zoneDone { background: var(--paper); color: var(--ink); }
   #sound.off .wave { display: none; } #sound:not(.off) .mute { display: none; }
   #pills {
     position: fixed; left: 0; right: 0; bottom: calc(var(--bot) + 12px);
@@ -129,7 +154,7 @@
 
 <button id="score" type="button" aria-label="Open today's points">
   <span id="pts">0</span>
-  <span id="sub">Head pinches today: 0</span>
+  <span id="sub">Crushed today: 0</span>
 </button>
 <div id="combo" hidden></div>
 <div id="debug"></div>
@@ -141,8 +166,22 @@
 <button id="flip" class="round" type="button" aria-label="Flip camera">
   <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg>
 </button>
+<button id="zoneBtn" class="round" type="button" aria-label="Set the crush zone">
+  <svg viewBox="0 0 24 24"><path d="M6 2v16h16"/><path d="M2 6h16v16"/></svg>
+</button>
+<div id="zoneEdit" hidden>
+  <div id="zoneBox">
+    <div class="grip g-top" data-edge="top"></div><div class="grip g-bottom" data-edge="bottom"></div>
+    <div class="grip g-left" data-edge="left"></div><div class="grip g-right" data-edge="right"></div>
+    <div id="zoneLabel"></div>
+  </div>
+  <div id="zoneBar">
+    <button id="zoneReset" type="button">Reset</button>
+    <button id="zoneDone" type="button">Done</button>
+  </div>
+</div>
 <div id="pills">
-  <button type="button" data-fx="squish">Squish</button>
+  <button type="button" data-fx="squish">Crush</button>
   <button type="button" data-fx="boom">Explode</button>
   <button type="button" data-fx="eyes">Eyes</button>
   <button type="button" data-fx="confetti">Confetti</button>
@@ -157,7 +196,7 @@
     <div class="sheetBtns">
       <button id="resetDay" type="button">Reset today</button>
       <button id="trackMode" type="button">Tracking</button>
-      <button id="closeSheet" type="button">Back to pinching</button>
+      <button id="closeSheet" type="button">Back to crushing</button>
     </div>
   </div>
 </div>
@@ -172,14 +211,14 @@
     <path d="M66 4v26M66 128v-26" stroke="#ffe14d" stroke-width="9" stroke-linecap="round"/>
     <path d="M56 22l10 10 10-10M56 110l10-10 10 10" fill="none" stroke="#ffe14d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
-  <h1>Head <span>Pinch</span></h1>
-  <p>Aim the back camera at somebody. Hold your other hand out in front of the lens and pinch their head.</p>
+  <h1>Head <span>Crusher</span></h1>
+  <p>Aim the back camera at a person, a pet, a horse or a car. Hold one hand out in the middle of the view and crush it between your fingers.</p>
   <div id="startStats"></div>
   <button id="startBtn" type="button" disabled>Loading</button>
 </div>
 
 <script type="module">
-import { FaceDetector, HandLandmarker, FilesetResolver } from "./assets/vision_bundle.mjs";
+import { FaceDetector, HandLandmarker, ObjectDetector, FilesetResolver } from "./assets/vision_bundle.mjs";
 
 const $ = id => document.getElementById(id);
 const stage = $("stage"), video = $("cam"), canvas = $("overlay"), ctx = canvas.getContext("2d");
@@ -193,21 +232,42 @@ const TEST_SRC = params.get("src"); // test only: play a still image as the came
 // ---------- tuning ----------
 const PINCH_CLOSE = 0.30;      // finger gap under this share of hand size counts as closed
 const PINCH_OPEN = 0.50;       // gap over this share re-arms the pinch
-const FACE_PERSIST_MS = 900;   // a head stays pinchable this long after the hand covers it
-const COOLDOWN_MS = 700;       // rest time before the same head scores again
+const FACE_PERSIST_MS = 900;   // a target stays crushable this long after the hand covers it
+const COOLDOWN_MS = 700;       // rest time before the same target scores again
 const COMBO_WINDOW_MS = 4000;  // hits inside this window chain a combo
-const BASE_POINTS = 100;
 const FAR_RATIO = 0.16, LONG_RATIO = 0.08; // face width as a share of the short screen side
+
+// Only a hand whose fingertips are inside the crush zone can crush. Hands resting in the dead zones
+// at the edges are ignored. Each edge is a share of the screen, and the player can drag them in the app.
+const ZONE_DEFAULT = { top: 0.15, bottom: 0.25, left: 0.10, right: 0.10 };
+const ZONE_MIN = 0.2;          // the zone never gets narrower or shorter than this share of the screen
+const ZONE_KEEP = 0.06;        // the crusher may drift this much past the box before it lets go
+const CRUSHER_LOST_MS = 350;   // after this long without the crusher, another hand may take over
+const MOVING_SPEED = 0.18;     // a target moving faster than this share of the short side per second is "moving"
+
+// what can be crushed, and what each is worth
+const KINDS = {
+  head:   { pts: 100, color: "#ff3b30" },
+  animal: { pts: 150, color: "#ff9f0a" },
+  car:    { pts: 200, color: "#0a84ff" },
+};
+const OBJECT_KINDS = {
+  cat: "animal", dog: "animal", horse: "animal", sheep: "animal", cow: "animal", bird: "animal",
+  bear: "animal", zebra: "animal", giraffe: "animal", elephant: "animal",
+  car: "car", truck: "car", bus: "car", motorcycle: "car",
+};
 
 const RED = "#ff3b30", YELLOW = "#ffe14d";
 const CONFETTI = ["#ff3b30", "#ffe14d", "#34c759", "#0a84ff", "#ff9f0a", "#bf5af2", "#ffffff"];
 
 // ---------- saved state ----------
-const DAY_KEY = "headpinch.days.v1", PREF_KEY = "headpinch.prefs.v1";
+const DAY_KEY = "headcrusher.days.v1", PREF_KEY = "headcrusher.prefs.v1";
+const OLD_DAY_KEY = "headpinch.days.v1", OLD_PREF_KEY = "headpinch.prefs.v1"; // scores from the Head Pinch days carry over
 const readJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-let days = readJSON(DAY_KEY, {});
-let prefs = Object.assign({ fx: "mix", sound: true }, readJSON(PREF_KEY, {}));
+let days = readJSON(DAY_KEY, null) || readJSON(OLD_DAY_KEY, {});
+let prefs = Object.assign({ fx: "mix", sound: true }, readJSON(PREF_KEY, null) || readJSON(OLD_PREF_KEY, {}));
+prefs.zone = Object.assign({}, ZONE_DEFAULT, prefs.zone || {});
 
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 function today() {
@@ -226,15 +286,17 @@ function bestDay() {
   return best;
 }
 const fmt = n => Math.round(n).toLocaleString();
-const heads = n => `${fmt(n)} ${n === 1 ? "head" : "heads"}`;
+const heads = n => `${fmt(n)} ${n === 1 ? "crush" : "crushes"}`;
 
 // ---------- game state ----------
-let faceFull, faceShort, handLandmarker, handDelegate = "GPU";
+let faceFull, faceShort, handLandmarker, objectDetector = null, handDelegate = "GPU";
 let stream = null, facing = "environment", mirrored = false;
 let started = false, running = false, loopToken = 0;
 let W = 0, H = 0, DPR = 1, T = null;
-let faces = [], nextFaceId = 1;
-const pinch = { closed: false, armed: false, hand: null, lastSeen: 0 };
+let faces = [], objects = [], nextFaceId = 1;
+// one crusher at a time: the hand that is locked on, and its finger state
+const pinch = { closed: false, armed: false, hand: null, lastSeen: 0, locked: false };
+let otherHands = 0, editingZone = false;
 let combo = 0, lastHitAt = -1e9;
 const fx = [], parts = [], floats = [];
 let flashAt = -1e9, lastFrameAt = 0, lastVideoTime = -1, frameNo = 0;
@@ -293,6 +355,13 @@ async function loadModels() {
   handDelegate = FORCE_CPU ? "CPU" : "GPU";
   try { handLandmarker = await hand(handDelegate); }
   catch (e) { console.warn("Fast hand tracking failed, using the processor", e); handDelegate = "CPU"; handLandmarker = await hand("CPU"); }
+  // Animals and cars. If this model fails the game still runs on heads alone.
+  try {
+    objectDetector = await ObjectDetector.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: "./assets/models/efficientdet_lite0.tflite", delegate: "CPU" },
+      runningMode: "VIDEO", scoreThreshold: 0.35, maxResults: 6, categoryAllowlist: Object.keys(OBJECT_KINDS),
+    });
+  } catch (e) { console.warn("Animal and car tracking did not load", e); objectDetector = null; }
 }
 const faceDetector = () => (facing === "user" && !TEST_SRC ? faceShort : faceFull);
 
@@ -320,7 +389,7 @@ async function startCamera() {
   video.srcObject = stream;
   video.classList.toggle("mirrored", mirrored);
   await video.play();
-  lastVideoTime = -1; faces = [];
+  lastVideoTime = -1; faces = []; objects = [];
 }
 let wake = null;
 async function keepAwake() { try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
@@ -361,45 +430,136 @@ function updateFaces(dets, now) {
       best.eyes = eyes.map((e, i) => ({ x: best.eyes[i].x + (e.x - best.eyes[i].x) * a, y: best.eyes[i].y + (e.y - best.eyes[i].y) * a }));
       best.lastSeen = now;
     } else {
-      faces.push({ x, y, w, h, eyes, lastSeen: now, cooldownUntil: 0, id: nextFaceId++ });
+      faces.push({ kind: "head", label: "head", x, y, w, h, eyes, lastSeen: now, cooldownUntil: 0, id: nextFaceId++ });
     }
   }
   faces = faces.filter(f => now - f.lastSeen < FACE_PERSIST_MS);
   if (faces.length) lastFaceAt = now;
 }
 // The face box runs brow to chin. The head box adds hair and ears, and it is the hit area.
-const head = f => ({ x: f.x - f.w * 0.14, y: f.y - f.h * 0.42, w: f.w * 1.28, h: f.h * 1.56 });
+// Animals and cars use their box as it is.
+const box = f => f.kind === "head"
+  ? { x: f.x - f.w * 0.14, y: f.y - f.h * 0.42, w: f.w * 1.28, h: f.h * 1.56 }
+  : { x: f.x, y: f.y, w: f.w, h: f.h };
+const targets = () => faces.concat(objects);
 
-// ---------- pinch ----------
-function readHand(res) {
+// ---------- animal and car tracking ----------
+// Detection runs every few frames, so each target carries a velocity and glides between looks.
+// That keeps the hit box on a moving car instead of a step behind it.
+// the small model mixes up cats and dogs, so both read as a pet
+const LABELS = { cat: "pet", dog: "pet", motorcycle: "motorbike" };
+const overlap = (a, b) => {
+  const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  return ix * iy / Math.min(a.w * a.h, b.w * b.h);
+};
+function updateObjects(dets, now) {
+  const seen = new Set(), kept = [];
+  for (const d of [...dets].sort((a, b) => (b.categories?.[0]?.score || 0) - (a.categories?.[0]?.score || 0))) {
+    const b = d.boundingBox, cat = d.categories && d.categories[0]; if (!b || !cat) continue;
+    const kind = OBJECT_KINDS[cat.categoryName]; if (!kind) continue;
+    const label = LABELS[cat.categoryName] || cat.categoryName;
+    const x = b.originX * T.s + T.ox, y = b.originY * T.s + T.oy, w = b.width * T.s, h = b.height * T.s;
+    // one box per thing: drop a weaker box that mostly sits on top of a stronger one
+    if (kept.some(k => overlap(k, { x, y, w, h }) > 0.6)) continue;
+    kept.push({ x, y, w, h });
+    const cx = x + w / 2, cy = y + h / 2;
+    let best = null, bestD = Infinity;
+    for (const o of objects) {
+      if (o.kind !== kind || seen.has(o)) continue;
+      const dd = Math.hypot(o.x + o.w / 2 - cx, o.y + o.h / 2 - cy);
+      if (dd < bestD && dd < Math.max(o.w, o.h, w, h) * 0.8) { best = o; bestD = dd; }
+    }
+    if (best) {
+      const gap = Math.max((now - best.detAt) / 1000, 0.016);
+      const vx = (cx - best.rawX) / gap, vy = (cy - best.rawY) / gap;
+      best.vx += (vx - best.vx) * 0.5; best.vy += (vy - best.vy) * 0.5;
+      const a = 0.6;
+      best.x += (x - best.x) * a; best.y += (y - best.y) * a; best.w += (w - best.w) * a; best.h += (h - best.h) * a;
+      best.rawX = cx; best.rawY = cy; best.detAt = now; best.lastSeen = now; best.label = label;
+      seen.add(best);
+    } else {
+      const o = { kind, label, x, y, w, h, vx: 0, vy: 0, rawX: cx, rawY: cy, detAt: now, lastSeen: now, cooldownUntil: 0, id: nextFaceId++ };
+      objects.push(o); seen.add(o);
+    }
+  }
+  objects = objects.filter(o => now - o.lastSeen < FACE_PERSIST_MS);
+  if (objects.length) lastFaceAt = now;
+}
+function glideObjects(now, dt) {
+  for (const o of objects) {
+    if (now - o.detAt > 300) { o.vx *= 0.8; o.vy *= 0.8; continue; } // lost sight of it: stop guessing
+    o.x += o.vx * dt; o.y += o.vy * dt;
+  }
+}
+const speedOf = o => Math.hypot(o.vx || 0, o.vy || 0);
+const isMoving = o => o.kind !== "head" && speedOf(o) > Math.min(W, H) * MOVING_SPEED;
+// cartoon eyes: real eye points on a face, a best guess on an animal or a car
+function eyesOf(f) {
+  if (f.kind === "head") return f.eyes;
+  const b = box(f), y = b.y + b.h * (f.kind === "car" ? 0.42 : 0.3);
+  return [{ x: b.x + b.w * 0.36, y }, { x: b.x + b.w * 0.64, y }];
+}
+
+// ---------- the crusher ----------
+// The crush zone is the middle of the screen. Only a hand inside it can become the crusher,
+// and only one hand is the crusher at a time. Hands resting at the edges never take over.
+function zoneRect(extra = 0) {
+  const z = prefs.zone;
+  const x = W * (z.left - extra), y = H * (z.top - extra);
+  return { x, y, w: W * (1 - z.left - z.right + extra * 2), h: H * (1 - z.top - z.bottom + extra * 2) };
+}
+// hand points are in camera space, the zone is in screen space, so a selfie view is flipped back first
+const inZone = (p, extra = 0) => { const z = zoneRect(extra), x = screenX(p.x); return x >= z.x && x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h; };
+function readHands(res) {
   const list = res.landmarks || []; handCount = list.length;
-  let best = null;
-  for (const lm of list) {
+  return list.map(lm => {
     const P = i => ({ x: lm[i].x * T.vw * T.s + T.ox, y: lm[i].y * T.vh * T.s + T.oy });
     const wrist = P(0), a = P(5), b = P(17), thumb = P(4), index = P(8);
     const size = Math.max(dist(wrist, a), dist(wrist, b), dist(a, b) * 1.6);
-    // the biggest hand is the nearest one, so it is the player's
-    if (!best || size > best.size) best = { thumb, index, size, gap: dist(thumb, index), mid: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 } };
-  }
-  return best;
+    return { thumb, index, size, gap: dist(thumb, index), mid: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 } };
+  });
 }
-function updatePinch(hand, now) {
-  pinch.hand = hand;
-  if (!hand) { if (now - pinch.lastSeen > 300) { pinch.closed = false; pinch.armed = false; } return; }
+function pickCrusher(hands, now) {
+  // keep following the hand that is already crushing, as long as it stays near the middle
+  if (pinch.locked && pinch.hand) {
+    let best = null, bestD = Infinity;
+    const reach = Math.max(pinch.hand.size * 1.5, Math.min(W, H) * 0.2);
+    for (const h of hands) {
+      const dd = dist(h.mid, pinch.hand.mid);
+      if (dd < bestD && dd < reach) { best = h; bestD = dd; }
+    }
+    if (best && inZone(best.mid, ZONE_KEEP)) return { hand: best, fresh: false };
+    if (now - pinch.lastSeen < CRUSHER_LOST_MS) return { hand: null, fresh: false }; // brief dropout, hold the lock
+  }
+  // otherwise the nearest hand (the biggest) inside the zone takes over
+  let best = null;
+  for (const h of hands) if (inZone(h.mid) && (!best || h.size > best.size)) best = h;
+  return { hand: best, fresh: true };
+}
+function updatePinch(hands, now) {
+  const { hand, fresh } = pickCrusher(hands, now);
+  otherHands = hands.length - (hand ? 1 : 0);
+  if (!hand) {
+    if (now - pinch.lastSeen > CRUSHER_LOST_MS) { pinch.locked = false; pinch.hand = null; pinch.closed = false; pinch.armed = false; }
+    return;
+  }
+  // a new crusher has to open its fingers before its first crush counts
+  if (fresh || !pinch.locked) { pinch.closed = false; pinch.armed = false; }
+  pinch.hand = hand; pinch.locked = true;
   pinch.lastSeen = now; lastHandAt = now;
   const r = hand.gap / hand.size;
   if (r > PINCH_OPEN) { pinch.armed = true; pinch.closed = false; }
   else if (r < PINCH_CLOSE && !pinch.closed) {
     pinch.closed = true;
-    if (pinch.armed) { pinch.armed = false; onPinch(hand, now); }
+    if (pinch.armed && !editingZone) { pinch.armed = false; onPinch(hand, now); }
   }
 }
 function onPinch(hand, now) {
   const axis = Math.abs(hand.thumb.y - hand.index.y) >= Math.abs(hand.thumb.x - hand.index.x) ? "y" : "x";
   let hit = null, hitD = Infinity;
-  for (const f of faces) {
+  for (const f of targets()) {
     if (now < f.cooldownUntil) continue;
-    const hd = head(f), pad = Math.max(hd.w * 0.2, Math.min(W, H) * 0.04);
+    const hd = box(f), pad = Math.max(hd.w * 0.2, Math.min(W, H) * 0.04);
     if (hand.mid.x < hd.x - pad || hand.mid.x > hd.x + hd.w + pad || hand.mid.y < hd.y - pad || hand.mid.y > hd.y + hd.h + pad) continue;
     const dd = Math.hypot(hd.x + hd.w / 2 - hand.mid.x, hd.y + hd.h / 2 - hand.mid.y);
     if (dd < hitD) { hit = f; hitD = dd; }
@@ -409,15 +569,22 @@ function onPinch(hand, now) {
 }
 function scoreHit(f, axis, now) {
   f.cooldownUntil = now + COOLDOWN_MS;
-  const ratio = f.w / Math.min(W, H);
-  const range = ratio < LONG_RATIO ? 3 : ratio < FAR_RATIO ? 2 : 1;
+  const kind = f.kind || "head", ratio = f.w / Math.min(W, H);
+  // distance bonus is for heads, since a face has a known size; animals and cars pay more up front
+  const range = kind !== "head" ? 1 : ratio < LONG_RATIO ? 3 : ratio < FAR_RATIO ? 2 : 1;
+  const moving = isMoving(f);
   combo = now - lastHitAt < COMBO_WINDOW_MS ? combo + 1 : 1; lastHitAt = now;
   const mult = Math.min(1 + 0.5 * (combo - 1), 5);
-  const pts = Math.round(BASE_POINTS * range * mult / 10) * 10;
-  const d = today(); d.pts += pts; d.heads += 1; d.combo = Math.max(d.combo || 0, combo); saveDays();
+  const pts = Math.round(KINDS[kind].pts * range * (moving ? 1.5 : 1) * mult / 10) * 10;
+  const d = today(); d.pts += pts; d.heads += 1; d.combo = Math.max(d.combo || 0, combo);
+  d.kinds = d.kinds || {}; d.kinds[kind] = (d.kinds[kind] || 0) + 1; saveDays();
 
-  const hd = head(f);
-  const tags = []; if (range === 3) tags.push("LONG SHOT"); else if (range === 2) tags.push("FAR"); if (combo > 1) tags.push(`COMBO x${combo}`);
+  const hd = box(f);
+  const tags = [];
+  if (kind !== "head") tags.push(f.label.toUpperCase());
+  if (moving) tags.push("MOVING");
+  if (range === 3) tags.push("LONG SHOT"); else if (range === 2) tags.push("FAR");
+  if (combo > 1) tags.push(`COMBO x${combo}`);
   floats.push({ x: hd.x + hd.w / 2, y: hd.y, txt: `+${fmt(pts)}`, sub: tags.join("  "), born: now, life: 1100 });
 
   const pick = prefs.fx === "mix" ? ["squish", "boom", "eyes", "confetti"][Math.floor(Math.random() * 4)] : prefs.fx;
@@ -428,7 +595,7 @@ function scoreHit(f, axis, now) {
 
 // ---------- effects ----------
 function fire(name, f, axis, now) {
-  const side = Math.min(W, H), hd = head(f), base = Math.min(Math.max(hd.w, side * 0.16), side * 0.45);
+  const side = Math.min(W, H), hd = box(f), base = Math.min(Math.max(hd.w, side * 0.16), side * 0.45);
   const cx = hd.x + hd.w / 2, cy = hd.y + hd.h / 2;
   if (name === "squish") {
     fx.push({ type: "squish", f, axis, start: now, dur: 560 }); sfx.squish();
@@ -491,7 +658,7 @@ function squishAmount(t) {
   return 0.36 + 0.64 * backOut(u);
 }
 function drawSquish(e, now) {
-  const t = clamp01((now - e.start) / e.dur), k = squishAmount(t), hd = head(e.f);
+  const t = clamp01((now - e.start) / e.dur), k = squishAmount(t), hd = box(e.f);
   if (e.axis === "x") {
     const m = hd.w * 0.7, nw = hd.w * k, nl = hd.x + (hd.w - nw) / 2, nr = nl + nw, y = hd.y - hd.h * 0.05, h = hd.h * 1.1;
     drawVid(hd.x - m, y, m, h, hd.x - m, y, nl - (hd.x - m), h);
@@ -505,7 +672,7 @@ function drawSquish(e, now) {
   }
 }
 function drawBlast(e, now) {
-  const t = clamp01((now - e.start) / e.dur), hd = head(e.f), cx = hd.x + hd.w / 2, cy = hd.y + hd.h / 2;
+  const t = clamp01((now - e.start) / e.dur), hd = box(e.f), cx = hd.x + hd.w / 2, cy = hd.y + hd.h / 2;
   ctx.fillStyle = `rgba(30,22,22,${0.92 * (1 - t * t)})`;
   ctx.beginPath(); ctx.ellipse(cx, cy, hd.w * 0.62, hd.h * 0.6, 0, 0, 6.283); ctx.fill();
   const layers = [["#ff7a00", 1], ["#ffd21f", 0.72], ["#ffffff", 0.42]];
@@ -521,8 +688,9 @@ function drawBlast(e, now) {
   ctx.globalAlpha = 1;
 }
 function drawEyes(e, now) {
-  const ms = now - e.start, t = clamp01(ms / e.dur), f = e.f;
-  const r = Math.max(f.w * 0.2, 9);
+  const ms = now - e.start, t = clamp01(ms / e.dur), b = box(e.f), eyes = eyesOf(e.f);
+  const f = { w: e.f.kind === "head" ? e.f.w : Math.min(b.w, b.h) * 0.55, eyes };
+  const r = Math.min(Math.max(f.w * 0.2, 9), Math.min(W, H) * 0.08);
   const pop = t < 0.14 ? backOut(t / 0.14) : t > 0.82 ? 1 - clamp01((t - 0.82) / 0.18) : 1;
   const dang = t < 0.14 ? 0 : t > 0.82 ? 1 - clamp01((t - 0.82) / 0.18) : easeOut((t - 0.14) / 0.25);
   const leftIdx = f.eyes[0].x <= f.eyes[1].x ? 0 : 1;
@@ -574,6 +742,15 @@ function roundRect(x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 
+// The crush zone outline. The dead zones outside it are dimmed a touch so the player can see them.
+function drawZone() {
+  const z = zoneRect(), live = pinch.locked;
+  ctx.fillStyle = "rgba(0,0,0,.22)";
+  ctx.fillRect(0, 0, W, z.y); ctx.fillRect(0, z.y + z.h, W, H - z.y - z.h);
+  ctx.fillRect(0, z.y, z.x, z.h); ctx.fillRect(z.x + z.w, z.y, W - z.x - z.w, z.h);
+  ctx.strokeStyle = live ? "rgba(80,230,130,.7)" : "rgba(255,255,255,.35)"; ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]); roundRect(z.x, z.y, z.w, z.h, 16); ctx.stroke(); ctx.setLineDash([]);
+}
 function draw(now, dt) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0, 0, W, H);
@@ -583,9 +760,9 @@ function draw(now, dt) {
   ctx.save();
   if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
   for (const e of fx) if (e.type === "squish") drawSquish(e, now);
-  for (const f of faces) {
-    const hd = head(f);
-    ctx.strokeStyle = now < f.cooldownUntil ? YELLOW : RED; ctx.lineWidth = 3;
+  for (const f of targets()) {
+    const hd = box(f);
+    ctx.strokeStyle = now < f.cooldownUntil ? YELLOW : KINDS[f.kind].color; ctx.lineWidth = 3;
     roundRect(hd.x, hd.y, hd.w, hd.h, Math.min(hd.w, hd.h) * 0.14); ctx.stroke();
   }
   for (const e of fx) { if (e.type === "blast") drawBlast(e, now); else if (e.type === "eyes") drawEyes(e, now); else if (e.type === "ring") drawRing(e, now); }
@@ -598,8 +775,15 @@ function draw(now, dt) {
   }
   ctx.restore();
 
-  // score pops are text, so they are drawn the right way round
+  drawZone();
+  // labels and score pops are text, so they are drawn the right way round
   ctx.textAlign = "center"; ctx.lineJoin = "round";
+  ctx.font = `800 12px -apple-system, "Helvetica Neue", sans-serif`;
+  for (const o of objects) {
+    const b = box(o), x = screenX(b.x + b.w / 2), y = Math.max(b.y - 7, 14);
+    ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,.7)"; ctx.strokeText(o.label.toUpperCase(), x, y);
+    ctx.fillStyle = KINDS[o.kind].color; ctx.fillText(o.label.toUpperCase(), x, y);
+  }
   for (let i = floats.length - 1; i >= 0; i--) {
     const fl = floats[i], u = (now - fl.born) / fl.life;
     if (u > 1) { floats.splice(i, 1); continue; }
@@ -623,13 +807,13 @@ let hudDay = "";
 function renderHud(pop) {
   const d = today();
   ptsEl.textContent = fmt(d.pts);
-  subEl.textContent = `Head pinches today: ${fmt(d.heads)}`;
+  subEl.textContent = `Crushed today: ${fmt(d.heads)}`;
   hudDay = dayKey();
   if (pop) { ptsEl.classList.add("pop"); setTimeout(() => ptsEl.classList.remove("pop"), 140); }
 }
 function renderStartStats() {
   const d = today(), b = bestDay(), bits = [];
-  if (d.pts) bits.push(`Today ${fmt(d.pts)} pts`, `Head pinches today: ${fmt(d.heads)}`);
+  if (d.pts) bits.push(`Today ${fmt(d.pts)} pts`, `Crushed today: ${fmt(d.heads)}`);
   if (b && b.key !== dayKey()) bits.push(`Best day ${fmt(b.pts)}`);
   $("startStats").textContent = bits.join("  ·  ");
 }
@@ -639,8 +823,8 @@ function tickHud(now) {
   comboEl.hidden = !live; if (live) comboEl.textContent = `Combo x${combo}`;
   let hint = "";
   if (now - lastHitAt > 2500) {
-    if (now - lastFaceAt > 1500) hint = "Find a head";
-    else if (now - lastHandAt > 2000) hint = "Hold your hand out in front of the lens";
+    if (now - lastFaceAt > 1500) hint = "Find a head, a pet or a car";
+    else if (now - lastHandAt > 2000) hint = otherHands ? "Bring your hand into the middle box" : "Hold your hand out in the middle of the view";
     else if (pinch.hand && !pinch.armed && !pinch.closed) hint = "Open your fingers, then pinch";
   }
   if (hintEl.textContent !== hint) hintEl.textContent = hint;
@@ -653,14 +837,17 @@ function frame(now, force) {
   T = cover();
   if (force || video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime; frameNo++;
+    // faces on odd frames, animals and cars on every fourth even frame, hands every frame
     if (frameNo % 2 || force) updateFaces(faceDetector().detectForVideo(video, now).detections, now);
-    updatePinch(readHand(handLandmarker.detectForVideo(video, now)), now);
+    if (objectDetector && (frameNo % 4 === 0 || force)) updateObjects(objectDetector.detectForVideo(video, now).detections, now);
+    updatePinch(readHands(handLandmarker.detectForVideo(video, now)), now);
     frames++;
   }
+  glideObjects(now, dt);
   draw(now, dt);
   if (now - lastFpsAt > 1000) {
     fps = frames; frames = 0; lastFpsAt = now;
-    debugEl.textContent = `${fps} fps · ${faces.length} face · ${handCount} hand · ${handDelegate === "GPU" ? "fast" : "safe"}`;
+    debugEl.textContent = `${fps} fps · ${faces.length} face · ${objects.length} animal/car · ${handCount} hand${otherHands ? ` (${otherHands} ignored)` : ""} · ${handDelegate === "GPU" ? "fast" : "safe"}`;
     tickHud(now);
   }
 }
@@ -699,6 +886,38 @@ flipBtn.addEventListener("click", async () => {
   try { await startCamera(); } catch (e) { showBanner("Could not switch cameras: " + e.message); } finally { flipBtn.disabled = false; }
 });
 
+// crush zone editor
+const zoneEdit = $("zoneEdit"), zoneBox = $("zoneBox"), zoneLabel = $("zoneLabel");
+const pct = v => `${Math.round(v * 100)}%`;
+function paintZone() {
+  const z = prefs.zone;
+  Object.assign(zoneBox.style, { left: pct(z.left), top: pct(z.top), right: pct(z.right), bottom: pct(z.bottom) });
+  zoneLabel.innerHTML = `Crush zone<small>Top ${pct(z.top)} · Bottom ${pct(z.bottom)}<br>Left ${pct(z.left)} · Right ${pct(z.right)}</small>`;
+}
+function openZone() { editingZone = true; paintZone(); zoneEdit.hidden = false; }
+function closeZone() { editingZone = false; zoneEdit.hidden = true; writeJSON(PREF_KEY, prefs); }
+$("zoneBtn").addEventListener("click", openZone);
+$("zoneDone").addEventListener("click", closeZone);
+$("zoneReset").addEventListener("click", () => { prefs.zone = { ...ZONE_DEFAULT }; paintZone(); });
+for (const grip of zoneBox.querySelectorAll(".grip")) {
+  grip.addEventListener("pointerdown", e => {
+    e.preventDefault(); grip.setPointerCapture(e.pointerId);
+    const edge = grip.dataset.edge, z = prefs.zone;
+    const move = ev => {
+      const fx = clamp01(ev.clientX / window.innerWidth), fy = clamp01(ev.clientY / window.innerHeight);
+      // each edge stops where the zone would get thinner than ZONE_MIN
+      if (edge === "top") z.top = Math.min(fy, 1 - z.bottom - ZONE_MIN);
+      if (edge === "bottom") z.bottom = Math.min(1 - fy, 1 - z.top - ZONE_MIN);
+      if (edge === "left") z.left = Math.min(fx, 1 - z.right - ZONE_MIN);
+      if (edge === "right") z.right = Math.min(1 - fx, 1 - z.left - ZONE_MIN);
+      for (const k of ["top", "bottom", "left", "right"]) z[k] = Math.round(Math.max(0, z[k]) * 100) / 100;
+      paintZone();
+    };
+    const up = () => { grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up); grip.removeEventListener("pointercancel", up); writeJSON(PREF_KEY, prefs); };
+    grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", up); grip.addEventListener("pointercancel", up);
+  });
+}
+
 // day sheet
 const sheet = $("sheet"), resetBtn = $("resetDay"), trackBtn = $("trackMode");
 function openSheet() {
@@ -713,7 +932,7 @@ function openSheet() {
     li.append(name, h, p); list.append(li);
   }
   const b = bestDay(), d = today();
-  $("bestLine").textContent = b ? `Best day ${fmt(b.pts)} points. Longest combo today x${d.combo || 0}.` : "Pinch a head to put points on the board.";
+  $("bestLine").textContent = b ? `Best day ${fmt(b.pts)} points. Longest combo today x${d.combo || 0}.` : "Crush a head, a pet or a car to put points on the board.";
   resetBtn.textContent = "Reset today"; resetBtn.dataset.armed = "";
   trackBtn.textContent = handDelegate === "GPU" ? "Tracking is fast" : "Tracking is safe";
   sheet.hidden = false;
@@ -749,11 +968,19 @@ startBtn.addEventListener("click", async () => {
 // test hooks (used by the build checks, harmless in play)
 window.HP = {
   tick: () => frame(performance.now(), true),
-  state: () => ({ W, H, faces: faces.map(f => ({ ...head(f), eyes: f.eyes })), hand: pinch.hand, today: today(), combo, fx: fx.map(e => e.type), parts: parts.length, floats: floats.length, handDelegate, mirrored }),
+  state: () => ({ W, H, faces: faces.map(f => ({ ...box(f), eyes: f.eyes })), objects: objects.map(o => ({ ...box(o), kind: o.kind, label: o.label, moving: isMoving(o) })), zone: zoneRect(), locked: pinch.locked, otherHands, hand: pinch.hand, today: today(), combo, fx: fx.map(e => e.type), parts: parts.length, floats: floats.length, handDelegate, mirrored }),
   pinchAt: (x, y, axis = "y", t = performance.now()) => onPinch({ thumb: { x, y: y - (axis === "y" ? 4 : 0) }, index: { x: x + (axis === "x" ? 4 : 0), y: y + (axis === "y" ? 4 : 0) }, mid: { x, y }, size: 100, gap: 4 }, t),
   pause: () => { running = false; },
-  fakeHit: () => scoreHit({ x: W / 2 - 40, y: H / 2 - 50, w: 80, h: 100, eyes: [{ x: W / 2 - 16, y: H / 2 - 12 }, { x: W / 2 + 16, y: H / 2 - 12 }], cooldownUntil: 0, lastSeen: performance.now() }, "y", performance.now()),
+  fakeHit: () => scoreHit({ kind: "head", label: "head", x: W / 2 - 40, y: H / 2 - 50, w: 80, h: 100, eyes: [{ x: W / 2 - 16, y: H / 2 - 12 }, { x: W / 2 + 16, y: H / 2 - 12 }], cooldownUntil: 0, lastSeen: performance.now() }, "y", performance.now()),
   frameAt: t => frame(t, true),
+  // feed made-up hands straight to the crusher picker: [{ x, y, size, gap }]
+  hands: (list, t = performance.now()) => updatePinch(list.map(h => ({ thumb: { x: h.x, y: h.y - h.gap / 2 }, index: { x: h.x, y: h.y + h.gap / 2 }, mid: { x: h.x, y: h.y }, size: h.size || 100, gap: h.gap })), t),
+  // feed made-up detections in camera pixels: [{ label, x, y, w, h }]
+  objects: (list, t = performance.now()) => updateObjects(list.map(o => ({ boundingBox: { originX: o.x, originY: o.y, width: o.w, height: o.h }, categories: [{ categoryName: o.label, score: 0.9 }] })), t),
+  glide: (t, dt) => glideObjects(t, dt),
+  crusher: () => ({ locked: pinch.locked, hand: pinch.hand && pinch.hand.mid, armed: pinch.armed, closed: pinch.closed, otherHands }),
+  setZone: z => { prefs.zone = Object.assign({}, ZONE_DEFAULT, z); },
+  openZone, closeZone,
   setFx,
 };
 
