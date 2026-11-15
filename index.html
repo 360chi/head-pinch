@@ -50,15 +50,6 @@
     background: var(--yellow); color: var(--ink); font-weight: 900; font-size: 18px;
     padding: 4px 12px; border-radius: 999px; box-shadow: 0 4px 16px rgba(0,0,0,.4);
   }
-  #toast {
-    position: fixed; left: 50%; top: 36%; z-index: 6; width: max-content; max-width: calc(100% - 36px);
-    transform: translate(-50%, -50%) rotate(-3deg) scale(.4); opacity: 0; pointer-events: none;
-    background: var(--yellow); color: var(--ink); text-align: center; text-wrap: balance;
-    font-size: 27px; font-weight: 900; line-height: 1.1; letter-spacing: -.5px;
-    padding: 16px 22px; border-radius: 22px; box-shadow: 0 10px 34px rgba(0,0,0,.5);
-    transition: transform .28s cubic-bezier(.2,1.5,.4,1), opacity .2s ease;
-  }
-  #toast.show { transform: translate(-50%, -50%) rotate(-3deg) scale(1); opacity: 1; }
   #debug {
     position: fixed; left: 10px; top: calc(var(--top) + 8px);
     color: rgba(255,255,255,.5); font-size: 10px; font-variant-numeric: tabular-nums;
@@ -138,10 +129,9 @@
 
 <button id="score" type="button" aria-label="Open today's points">
   <span id="pts">0</span>
-  <span id="sub">Amount of head today: 0</span>
+  <span id="sub">Head pinches today: 0</span>
 </button>
 <div id="combo" hidden></div>
-<div id="toast" role="status"></div>
 <div id="debug"></div>
 
 <div id="hint"></div>
@@ -208,8 +198,6 @@ const COOLDOWN_MS = 700;       // rest time before the same head scores again
 const COMBO_WINDOW_MS = 4000;  // hits inside this window chain a combo
 const BASE_POINTS = 100;
 const FAR_RATIO = 0.16, LONG_RATIO = 0.08; // face width as a share of the short screen side
-const LOT_OF_HEAD = [10, 25, 50, 100, 200]; // head counts in a day that fire the pop up
-const LOT_LINE = "you got a lot of head today"; // Chi's line, keep it word for word
 
 const RED = "#ff3b30", YELLOW = "#ffe14d";
 const CONFETTI = ["#ff3b30", "#ffe14d", "#34c759", "#0a84ff", "#ff9f0a", "#bf5af2", "#ffffff"];
@@ -436,7 +424,6 @@ function scoreHit(f, axis, now) {
   fire(pick, f, axis, now);
   if (combo > 1) sfx.combo(combo);
   renderHud(true); tickHud(now);
-  if (LOT_OF_HEAD.includes(d.heads)) lotOfHead(now);
 }
 
 // ---------- effects ----------
@@ -476,21 +463,6 @@ function fire(name, f, axis, now) {
   if (parts.length > 500) parts.splice(0, parts.length - 500);
 }
 function shake() { stage.classList.remove("shake"); void stage.offsetWidth; stage.classList.add("shake"); }
-
-// the pop up for a big day, with confetti from the top of the screen
-let toastTimer = 0;
-function lotOfHead(now) {
-  const el = $("toast");
-  el.textContent = LOT_LINE; el.classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
-  const side = Math.min(W, H);
-  for (let i = 0; i < 110; i++) {
-    parts.push({ kind: "conf", x: Math.random() * W, y: -20 - Math.random() * H * 0.25, vx: (Math.random() - 0.5) * side * 0.5, vy: side * (0.3 + Math.random() * 0.9), g: side * 1.2,
-      w: 6 + Math.random() * 8, h: 9 + Math.random() * 10, rot: Math.random() * 6.283, vr: (Math.random() - 0.5) * 20,
-      color: CONFETTI[i % CONFETTI.length], born: now, life: 2200 + Math.random() * 1200 });
-  }
-  tone("triangle", 523, 523, 0.14, 0.2, 0.25); tone("triangle", 659, 659, 0.14, 0.2, 0.38); tone("triangle", 784, 784, 0.14, 0.2, 0.51); tone("triangle", 1047, 1047, 0.4, 0.22, 0.64);
-}
 
 // copy a piece of the live picture (screen rectangle in, small canvas out)
 function grab(r) {
@@ -651,13 +623,13 @@ let hudDay = "";
 function renderHud(pop) {
   const d = today();
   ptsEl.textContent = fmt(d.pts);
-  subEl.textContent = `Amount of head today: ${fmt(d.heads)}`;
+  subEl.textContent = `Head pinches today: ${fmt(d.heads)}`;
   hudDay = dayKey();
   if (pop) { ptsEl.classList.add("pop"); setTimeout(() => ptsEl.classList.remove("pop"), 140); }
 }
 function renderStartStats() {
   const d = today(), b = bestDay(), bits = [];
-  if (d.pts) bits.push(`Today ${fmt(d.pts)} pts`, `Amount of head today: ${fmt(d.heads)}`);
+  if (d.pts) bits.push(`Today ${fmt(d.pts)} pts`, `Head pinches today: ${fmt(d.heads)}`);
   if (b && b.key !== dayKey()) bits.push(`Best day ${fmt(b.pts)}`);
   $("startStats").textContent = bits.join("  ·  ");
 }
@@ -741,8 +713,7 @@ function openSheet() {
     li.append(name, h, p); list.append(li);
   }
   const b = bestDay(), d = today();
-  const lot = d.heads >= LOT_OF_HEAD[0] ? ` Amount of head today: ${fmt(d.heads)}, ${LOT_LINE}.` : "";
-  $("bestLine").textContent = b ? `Best day ${fmt(b.pts)} points. Longest combo today x${d.combo || 0}.${lot}` : "Pinch a head to put points on the board.";
+  $("bestLine").textContent = b ? `Best day ${fmt(b.pts)} points. Longest combo today x${d.combo || 0}.` : "Pinch a head to put points on the board.";
   resetBtn.textContent = "Reset today"; resetBtn.dataset.armed = "";
   trackBtn.textContent = handDelegate === "GPU" ? "Tracking is fast" : "Tracking is safe";
   sheet.hidden = false;
